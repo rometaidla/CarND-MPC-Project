@@ -16,6 +16,8 @@ using namespace std;
 using json = nlohmann::json;
 using namespace std;
 
+const double Lf = 2.67;
+
 // For converting back and forth between radians and degrees.
 constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
@@ -118,8 +120,15 @@ int main() {
           double steer_value = j[1]["steering_angle"];
           double throttle_value = j[1]["throttle"];
 
+          double actuator_delay = 0.1; // in seconds
+          double x0 = 0.0, y0 = 0.0, psi0 = 0.0; // everything is in vehicle coordinates
+          double x_delayed = x0 + v * cos(psi0) * actuator_delay;
+          double y_delayed = y0 + v * sin(psi0) * actuator_delay;
+          double psi_delayed = psi0 - v * steer_value * actuator_delay / Lf;
+          double v_delayed = v + throttle_value * actuator_delay;
+
           Eigen::VectorXd state(6);
-          state << 0, 0, 0, v, cte, epsi;
+          state << x_delayed, y_delayed, psi_delayed, v_delayed, cte, epsi;
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -185,7 +194,7 @@ int main() {
           //
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
           // SUBMITTING.
-          //this_thread::sleep_for(chrono::milliseconds(100));
+          this_thread::sleep_for(chrono::milliseconds(100));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {
