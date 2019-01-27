@@ -3,6 +3,67 @@ Self-Driving Car Engineer Nanodegree Program
 
 ---
 
+## Implementation
+
+### The Model
+
+Kinematic bicycle model is used to control the vehicle. It neclects all dynamic effects like wind, tire slip, intertia.
+
+State consist vehicle position _x_ and _y_, direction _psi_, speed _v_. For tracking cost cross track error _cte_
+and orientation error _epsi_ is added to state. State transition by time _dt_ is calculated as follows:
+
+```C++
+x[t+1] = x[t] + v[t] * cos(psi[t]) * dt;
+y[t+1] = y[t] + v[t] * sin(psi[t]) * dt;
+psi[t+1] = psi[t] + v[t] / Lf * delta[t] * dt;
+v[t+1] = v[t] + a[t] * dt;
+cte[t+1] = f(x[t]) - y[t] + v[t] * sin(epsi[t]) * dt;
+epsi[t+1] = psi[t] - psides[t] + v[t] * delta[t] / Lf * dt;
+```
+
+There is two actuators:
+1. _a_ - vehicle throttle, works as both brake and throttle, range -1.0...1.0
+2. _delta_ - steering angle, range -0.43...0.43
+
+### Timestep Length and Elapsed Duration (N & dt)
+
+```C++
+size_t N = 10;
+double dt = .1;
+```
+
+I used N and dt values from Q&A video as starting point. Tried to increase and decrease both parameters, but this seemed
+to only make model behaviour worse, so ended up using initial parameters from the video.
+
+### Polynomial Fitting and MPC Preprocessing
+
+Waypoints are prepocessed by transforming these to vehicle coordinate system:
+
+```C++
+for (int i = 0; i < ptsx.size(); i++) {
+   double shift_x = ptsx[i]-px;
+   double shift_y = ptsy[i]-py;
+
+   ptsx[i] = shift_x * cos(0-psi) - shift_y * sin(0-psi);
+   ptsy[i] = shift_x * sin(0-psi) + shift_y * cos(0-psi);
+ }
+```
+
+### Model Predictive Control with Latency
+
+Latency is implemented by calculating x, y, psi and v values by 100ms (actuator delay) to the future, when controls are actually actuated:
+
+```C++
+double actuator_delay = 0.1; // in seconds
+double x0 = 0.0, y0 = 0.0, psi0 = 0.0; // everything is in vehicle coordinates
+double x_delayed = x0 + v * cos(psi0) * actuator_delay;
+double y_delayed = y0 + v * sin(psi0) * actuator_delay;
+double psi_delayed = psi0 - v * steer_value * actuator_delay / Lf;
+double v_delayed = v + throttle_value * actuator_delay;
+```
+
+As everything is in vehicle coordinates, some of the above is actually unnecessary (for ex. calculating y_delayed as sin(0) is 0), but all calculations are kept for readability and in case different x0, y0, psi0 is used in future.
+
 ## Dependencies
 
 * cmake >= 3.5
